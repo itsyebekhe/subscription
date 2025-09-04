@@ -13,8 +13,8 @@ error_reporting(E_ALL);
 /** The URL of the Base64 encoded subscription file. */
 const GITHUB_SUB_URL = 'https://raw.githubusercontent.com/itsyebekhe/PSG/main/subscriptions/xray/base64/mix';
 
-/** The directory where sorted subscription files will be saved. */
-const OUTPUT_DIR = 'sorted_subscriptions';
+/** The root directory for all generated subscription files. */
+const OUTPUT_DIR = 'subscriptions';
 
 /** Timeout in seconds for each individual port check. */
 const PORT_CHECK_TIMEOUT = 3;
@@ -62,18 +62,9 @@ function is_valid_uuid(?string $uuid): bool { if ($uuid === null) { return false
 // PARALLEL HEALTH CHECK FUNCTION (MODIFIED FOR LATENCY)
 // ============================================================================
 
-/**
- * Checks a list of proxy configs for port reachability in parallel and measures latency.
- *
- * @param array $proxies An array of proxy config strings.
- * @return array An array of arrays, each containing 'config' and 'latency'.
- */
-function check_ports_parallel(array $proxies): array
-{
+function check_ports_parallel(array $proxies): array {
     $liveConfigs = [];
     $proxyData = [];
-
-    // First, parse all configs to get host and port
     foreach ($proxies as $config) {
         $wrapper = new ConfigWrapper($config);
         if ($wrapper->isValid()) {
@@ -84,23 +75,15 @@ function check_ports_parallel(array $proxies): array
             }
         }
     }
-
     $totalToCheck = count($proxyData);
     $checkedCount = 0;
     $batches = array_chunk($proxyData, PARALLEL_BATCH_SIZE);
-
     foreach ($batches as $batch) {
         $sockets = [];
         $socketData = [];
         $write = [];
-        $except = null;
-
         foreach ($batch as $details) {
-            $socket = @stream_socket_client(
-                "tcp://{$details['host']}:{$details['port']}",
-                $errno, $errstr, null, STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT
-            );
-            
+            $socket = @stream_socket_client("tcp://{$details['host']}:{$details['port']}", $errno, $errstr, null, STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT);
             if ($socket) {
                 $socketId = (int)$socket;
                 $sockets[$socketId] = $socket;
@@ -110,24 +93,18 @@ function check_ports_parallel(array $proxies): array
                 $checkedCount++;
             }
         }
-        
         while (!empty($write)) {
-            $w = $write;
-            $r = null;
-            $e = null;
+            $w = $write; $r = null; $e = null;
             $num = @stream_select($r, $w, $e, PORT_CHECK_TIMEOUT);
-
             if ($num === false) break;
-
             foreach ($w as $socket) {
                 $socketId = (int)$socket;
-                $latency = (microtime(true) - $socketData[$socketId]['startTime']) * 1000; // in milliseconds
+                $latency = (microtime(true) - $socketData[$socketId]['startTime']) * 1000;
                 $liveConfigs[] = ['config' => $socketData[$socketId]['config'], 'latency' => (int)$latency];
                 fclose($socket);
                 unset($write[$socketId], $sockets[$socketId]);
                 $checkedCount++;
             }
-            
             $now = microtime(true);
             foreach ($write as $socketId => $socket) {
                 if (($now - $socketData[$socketId]['startTime']) > PORT_CHECK_TIMEOUT) {
@@ -138,12 +115,8 @@ function check_ports_parallel(array $proxies): array
             }
             print_progress($checkedCount, $totalToCheck, "Checking ports: ");
         }
-        
-        foreach ($sockets as $socket) {
-            fclose($socket);
-        }
+        foreach ($sockets as $socket) { fclose($socket); }
     }
-
     return $liveConfigs;
 }
 
@@ -152,26 +125,17 @@ function check_ports_parallel(array $proxies): array
 // ============================================================================
 
 class ConfigWrapper {
-    private ?array $decoded;
-    private string $type;
+    private ?array $decoded; private string $type;
     public function __construct(string $config_string) { $this->type = detect_type($config_string) ?? 'unknown'; $this->decoded = configParse($config_string); }
     public function isValid(): bool { return $this->decoded !== null; }
     public function getType(): string { return $this->type; }
     public function getServer(): string { return match($this->type) { 'vmess' => $this->decoded['add'], 'ss' => $this->decoded['server_address'], default => $this->decoded['hostname'], }; }
     public function getPort(): int { return (int)(match($this->type) { 'ss' => $this->decoded['server_port'], default => $this->decoded['port'], }); }
-    public function getTag(): string { return ''; }
-    public function getUuid(): string { return ''; }
-    public function getPassword(): string { return ''; }
-    public function getSni(): string { return ''; }
-    public function getTransportType(): ?string { return null; }
-    public function getPath(): string { return ''; }
-    public function getServiceName(): string { return ''; }
-    public function get(string $key, $default = null) { return $this->decoded[$key] ?? $default; }
-    public function getParam(string $key, $default = null) { return $this->decoded['params'][$key] ?? $default; }
+    public function getTag(): string { return ''; } public function getUuid(): string { return ''; } public function getPassword(): string { return ''; } public function getSni(): string { return ''; } public function getTransportType(): ?string { return null; } public function getPath(): string { return ''; } public function getServiceName(): string { return ''; } public function get(string $key, $default = null) { return $this->decoded[$key] ?? $default; } public function getParam(string $key, $default = null) { return $this->decoded['params'][$key] ?? $default; }
 }
 
 // ============================================================================
-// MAIN EXECUTION LOGIC (MODIFIED FOR SORTING AND TOP N SELECTION)
+// MAIN EXECUTION LOGIC (WITH REVISED NAMING STRATEGY)
 // ============================================================================
 
 function main()
@@ -180,27 +144,19 @@ function main()
 
     echo "  - Fetching subscription file from GitHub...\n";
     $base64Content = @file_get_contents(GITHUB_SUB_URL);
-    if ($base64Content === false) {
-        echo "[ERROR] Failed to download the subscription file.\n";
-        exit(1);
-    }
+    if ($base64Content === false) { echo "[ERROR] Failed to download the subscription file.\n"; exit(1); }
 
     $decodedContent = base64_decode($base64Content);
-    if ($decodedContent === false) {
-        echo "[ERROR] Failed to decode the subscription file.\n";
-        exit(1);
-    }
+    if ($decodedContent === false) { echo "[ERROR] Failed to decode the subscription file.\n"; exit(1); }
 
     $allConfigs = preg_split('/\\R/', $decodedContent, -1, PREG_SPLIT_NO_EMPTY);
-    if (empty($allConfigs)) {
-        echo "[WARNING] No proxy configurations found.\n";
-        exit(0);
-    }
+    if (empty($allConfigs)) { echo "[WARNING] No proxy configurations found.\n"; exit(0); }
     echo "  - Found " . count($allConfigs) . " configs. Starting parallel health checks...\n";
 
     $liveConfigsWithLatency = check_ports_parallel($allConfigs);
     echo "\n  - Health check complete. Found " . count($liveConfigsWithLatency) . " live proxies.\n";
 
+    // --- 1. Categorize and Sort Proxies ---
     $categorizedConfigs = [];
     foreach ($liveConfigsWithLatency as $proxyInfo) {
         $type = detect_type($proxyInfo['config']);
@@ -210,52 +166,69 @@ function main()
     }
     ksort($categorizedConfigs);
 
-    if (!is_dir(OUTPUT_DIR)) {
-        mkdir(OUTPUT_DIR, 0755, true);
+    // --- 2. Create Directory Structure ---
+    echo "  - Preparing output directory structure...\n";
+    $baseDir = OUTPUT_DIR;
+    $dirs = [
+        "{$baseDir}/by_type/plaintext",
+        "{$baseDir}/by_type/base64",
+        "{$baseDir}/combined/plaintext",
+        "{$baseDir}/combined/base64",
+    ];
+    foreach ($dirs as $dir) {
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
     }
 
+    // --- 3. Save "by_type" Files ---
     $topFastestProxies = [];
-    echo "  - Saving sorted subscription files...\n";
+    $summaryDataByType = [];
+    echo "  - Saving subscriptions categorized by type...\n";
     foreach ($categorizedConfigs as $type => $proxies) {
-        // Sort this category by latency
-        usort($proxies, function($a, $b) {
-            return $a['latency'] <=> $b['latency'];
-        });
+        usort($proxies, fn($a, $b) => $a['latency'] <=> $b['latency']);
+        
+        $topFastestProxies = array_merge($topFastestProxies, array_slice($proxies, 0, TOP_N_PROXIES));
+        $summaryDataByType[$type] = count($proxies);
 
-        // Add the top N proxies of this type to our combined list
-        $topN = array_slice($proxies, 0, TOP_N_PROXIES);
-        $topFastestProxies = array_merge($topFastestProxies, $topN);
-
-        // --- Save the file for this type with ALL live proxies ---
         $allConfigsForType = array_column($proxies, 'config');
         $normalContent = implode("\n", $allConfigsForType);
         $base64Content = base64_encode($normalContent);
         
-        file_put_contents(OUTPUT_DIR . "/{$type}.txt", $normalContent);
-        file_put_contents(OUTPUT_DIR . "/{$type}_base64.txt", $base64Content);
-        
-        echo "    - Created {$type}.txt and {$type}_base64.txt (" . count($proxies) . " configs)\n";
+        file_put_contents("{$dirs[0]}/{$type}.txt", $normalContent);
+        file_put_contents("{$dirs[1]}/{$type}.txt", $base64Content);
+        echo "    - Saved {$type} (" . count($proxies) . " configs)\n";
     }
+
+    // --- 4. Save "combined" Files ---
+    echo "  - Saving combined subscription files...\n";
+
+    // Sort all live proxies by latency for the "all_live" file
+    usort($liveConfigsWithLatency, fn($a, $b) => $a['latency'] <=> $b['latency']);
+    $allLiveConfigs = array_column($liveConfigsWithLatency, 'config');
+    file_put_contents("{$dirs[2]}/all_live.txt", implode("\n", $allLiveConfigs));
+    file_put_contents("{$dirs[3]}/all_live.txt", base64_encode(implode("\n", $allLiveConfigs)));
+    echo "    - Saved all_live.txt (" . count($allLiveConfigs) . " configs)\n";
+
+    // Sort the collected top proxies by latency for the "top_fastest" file
+    usort($topFastestProxies, fn($a, $b) => $a['latency'] <=> $b['latency']);
+    $topConfigs = array_column($topFastestProxies, 'config');
+    file_put_contents("{$dirs[2]}/top_fastest.txt", implode("\n", $topConfigs));
+    file_put_contents("{$dirs[3]}/top_fastest.txt", base64_encode(implode("\n", $topConfigs)));
+    echo "    - Saved top_fastest.txt (" . count($topConfigs) . " configs)\n";
+
+    // --- 5. Create Summary File ---
+    $summary = [
+        'generated_at' => date('c'),
+        'proxies_found_in_source' => count($allConfigs),
+        'live_proxies_found' => count($liveConfigsWithLatency),
+        'live_proxies_by_type' => $summaryDataByType,
+    ];
+    file_put_contents("{$baseDir}/summary.json", json_encode($summary, JSON_PRETTY_PRINT));
+    echo "  - Generated summary.json\n";
     
-    // Now, sort the final combined list of top proxies by latency
-    usort($topFastestProxies, function($a, $b) {
-        return $a['latency'] <=> $b['latency'];
-    });
-
-    // --- Save the combined top proxies file ---
-    if (!empty($topFastestProxies)) {
-        echo "  - Creating combined link with the fastest proxies...\n";
-        $topConfigs = array_column($topFastestProxies, 'config');
-        $topNormalContent = implode("\n", $topConfigs);
-        $topBase64Content = base64_encode($topNormalContent);
-
-        file_put_contents(OUTPUT_DIR . "/top_proxies.txt", $topNormalContent);
-        file_put_contents(OUTPUT_DIR . "/top_proxies_base64.txt", $topBase64Content);
-        echo "    - Created top_proxies.txt and top_proxies_base64.txt (" . count($topConfigs) . " configs)\n";
-    }
-
     echo "\nProcess finished successfully!\n";
-    echo "Live proxy files are saved in the '" . OUTPUT_DIR . "' directory.\n";
+    echo "Subscription files are saved in the '" . OUTPUT_DIR . "' directory.\n";
 }
 
 main();
