@@ -4,6 +4,5 @@ hy2://de8854c7-fa17-4266-ae18-50a9732a0c4e@it1.1010991.xyz:3001?insecure=1&sni=i
 hy2://7992f244-8c2c-4a1a-923f-2e116e90149b@198.23.130.211:443?mport=26666-29999&insecure=1&sni=file-oss-ccs-02.dafei.de#%F0%9F%87%BA%F0%9F%87%B8%20US%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B43%5D
 hy2://79c4fe11-9787-406b-bf94-c1c1dbf59e28@77.223.214.193:31468?insecure=1&sni=www.bing.com#%F0%9F%87%A9%F0%9F%87%AA%20DE%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B46%5D
 hy2://a59be66d-1e59-40ea-b378-ceecd80c3337@45.11.1.62:443?mport=50000-55000&insecure=1&sni=www.microsoft.com#%F0%9F%87%AF%F0%9F%87%B5%20JP%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B50%5D
-hy2://dongtaiwang.com@108.181.5.130:63015?insecure=1&sni=apple.com#%F0%9F%87%BA%F0%9F%87%B8%20US%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B51%5D
 hy2://9363eedf-00e9-4b14-8d66-e596b02538bc@195.133.5.41:33079?insecure=1&obfs=salamander&obfs-password=NDhhNmY5YTY0MGYzOTgxYQ%3D%3D#%F0%9F%87%B7%F0%9F%87%BA%20RU%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B53%5D
 hy2://dongtaiwang.com@51.159.111.32:5355?insecure=1&sni=www.bing.com#%F0%9F%87%AB%F0%9F%87%B7%20FR%20%7C%20%F0%9F%94%92%20HY2%20%7C%20%40v2raytg%20%5B54%5D
